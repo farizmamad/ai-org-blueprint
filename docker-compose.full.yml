@@ -1,0 +1,56 @@
+# docker-compose.full.yml — Opsi A overlay: Claude Code CLI sidecar
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.full.yml up --build
+#   (or: make demo-full)
+#
+# What this adds
+# ──────────────
+#   claude-runner    Node.js container running Claude Code CLI as an HTTP service.
+#                    The main Python demo calls it via ClaudeCodeRunner.
+#
+# Overrides in this file
+# ──────────────────────
+#   demo.environment   LLM_RUNNER=claude_code, CLAUDE_RUNNER_URL
+#   demo.depends_on    adds claude-runner healthcheck
+#
+# Requirements
+# ────────────
+#   - ANTHROPIC_API_KEY in .env (real key — mock won't work with Claude Code CLI)
+#   - Docker with ~1 GB free for the Node.js + claude image
+#   - First build is slow (~2 min) because npm install -g @anthropic-ai/claude-code
+#
+# See docs/dual-runner-pattern.md for the full architectural rationale.
+
+services:
+
+  # ── Claude Code CLI sidecar ─────────────────────────────────────────────────
+  claude-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.claude-runner
+    ports:
+      - "8766:8766"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      CLAUDE_CODE_TIMEOUT: "300"
+    depends_on:
+      brain:
+        condition: service_healthy
+    healthcheck:
+      # Dockerfile.claude-runner installs curl, so we can use it here.
+      test: ["CMD", "curl", "-sf", "http://localhost:8766/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # ── Override demo to use ClaudeCodeRunner ───────────────────────────────────
+  demo:
+    depends_on:
+      claude-runner:
+        condition: service_healthy
+    environment:
+      LLM_RUNNER: claude_code
+      CLAUDE_RUNNER_URL: http://claude-runner:8766
+      # ANTHROPIC_BASE_URL is still set from base compose but ignored by ClaudeCodeRunner

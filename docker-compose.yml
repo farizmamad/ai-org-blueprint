@@ -1,0 +1,85 @@
+# docker-compose.yml — default Opsi C: three-runner pattern (Mock / API / ClaudeCode in-process)
+#
+# Services
+# ─────────
+#   brain      Brain HTTP API (SQLite-backed shared memory, port 8765)
+#   mock-llm   Fake Anthropic Messages API — no API key needed (port 8080)
+#   demo       One-shot: init brain → seed demo data → run delegation example
+#
+# Quickstart (no API key required):
+#   cp .env.example .env
+#   make demo
+#
+# Switch to real Claude API:
+#   echo "LLM_RUNNER=api"                        >> .env
+#   echo "ANTHROPIC_API_KEY=sk-ant-..."           >> .env
+#   make demo
+#
+# Switch to Claude Code CLI sidecar (Opsi A, opt-in):
+#   make demo-full   (uses docker-compose.full.yml overlay)
+
+services:
+
+  # ── Brain HTTP API ──────────────────────────────────────────────────────────
+  brain:
+    build: .
+    command: >
+      python -m uvicorn core.brain.api:app
+      --host 0.0.0.0 --port 8765 --log-level warning
+    volumes:
+      - ./data:/app/data
+    environment:
+      BRAIN_DB_PATH: /app/data/brain.db
+    ports:
+      - "8765:8765"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8765/health').read()\""
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Mock LLM (Anthropic-compatible) ────────────────────────────────────────
+  # Responds deterministically to POST /v1/messages — no API key required.
+  # Set ANTHROPIC_BASE_URL=http://mock-llm:8080 and LLM_RUNNER=api to route here.
+  # If LLM_RUNNER=mock (default), this service starts but is never called.
+  mock-llm:
+    build: .
+    command: python scripts/mock_llm_server.py
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()\""
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Demo runner (one-shot) ──────────────────────────────────────────────────
+  # Initialises the brain, seeds demo data, then runs the delegation walkthrough.
+  # Exit code propagates to docker-compose (--abort-on-container-exit).
+  demo:
+    build: .
+    command: >
+      bash -c "
+        python scripts/init_brain.py &&
+        python scripts/seed_demo.py &&
+        python examples/ceo-engineer-delegation/run.py
+      "
+    depends_on:
+      brain:
+        condition: service_healthy
+      mock-llm:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    env_file: .env
+    environment:
+      BRAIN_DB_PATH: /app/data/brain.db
+      BRAIN_API_URL: http://brain:8765
+      # Route APIRunner → mock-llm when LLM_RUNNER=api (no real key needed)
+      ANTHROPIC_BASE_URL: http://mock-llm:8080

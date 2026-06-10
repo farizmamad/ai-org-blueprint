@@ -1,0 +1,52 @@
+# Dockerfile.claude-runner — sidecar for the Claude Code CLI
+#
+# This image is the Node.js/claude half of the dual-runner setup.
+# The main faith image (Python) calls this sidecar via HTTP.
+#
+# Rebuild triggers:
+#   - Claude CLI version change (npm install -g @anthropic-ai/claude-code)
+#   - Changes to claude_runner/main.py
+#
+# NOT rebuilt when:
+#   - Python agent logic changes
+#   - Brain schema changes
+#   - System prompt changes
+#
+# Security note:
+#   Claude Code CLI requires --dangerously-skip-permissions when running
+#   non-interactively. This flag is intentionally used here because the
+#   sidecar is isolated in its own container with no access to the host
+#   filesystem. The container mounts only the repo directories explicitly
+#   listed in docker-compose.full.yml.
+#
+# Non-root:
+#   Claude CLI refuses --dangerously-skip-permissions as root.
+#   We create a 'runner' user (uid 1001) and run as that user.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @anthropic-ai/claude-code \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user — claude refuses --dangerously-skip-permissions as root
+RUN useradd -m -u 1001 -s /bin/bash runner
+
+RUN pip install --no-cache-dir fastapi uvicorn httpx
+
+COPY claude_runner/ /app/
+
+USER runner
+ENV HOME=/home/runner
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8766/health || exit 1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8766", "--log-level", "warning"]
