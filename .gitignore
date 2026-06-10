@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Environment / secrets — NEVER COMMIT
+.env
+.env.local
+*.key
+*.pem
+service-account*.json
+credentials.json
+
+# Local state
+brain.db
+brain.db-*
+*.sqlite
+*.sqlite3
+data/*
+!data/.gitkeep
+logs/
+
+# Docker
+docker-compose.override.yml
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Misc
+.coverage
+htmlcov/
+*.log
