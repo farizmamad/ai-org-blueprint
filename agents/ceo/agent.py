@@ -14,6 +14,8 @@ domain expertise.
 
 from __future__ import annotations
 
+import os
+
 from core.brain import BrainService
 from core.agents.runners.base import LLMRunner
 from core.orchestrator.agent_loop import AgentLoop
@@ -23,7 +25,9 @@ from tools.implementations.remember_tool import RememberTool
 
 AGENT_ID = "ceo"
 
-SYSTEM_PROMPT = """\
+_OWNER_NAME = os.getenv("OWNER_NAME", "the user")
+
+SYSTEM_PROMPT = f"""\
 You are the CEO of a small AI-powered organization. You are a coordinator and
 decision-maker — you do NOT implement tasks yourself.
 
@@ -49,7 +53,7 @@ Constraints:
   - Use `remember` to persist decisions that future sessions should know.
   - Use `record_episode` (type="decision") after significant delegation decisions.
 
-You speak directly to the user (Ahmad). Keep responses concise.
+You speak directly to {_OWNER_NAME}. Keep responses concise.
 """
 
 
