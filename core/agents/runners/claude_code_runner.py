@@ -75,6 +75,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from core.agents.runners.base import LLMRunner, RunnerResult
+from core.observability.metrics import record_llm_call
 
 if TYPE_CHECKING:
     from core.brain.service import BrainService
@@ -252,6 +253,7 @@ class ClaudeCodeRunner(LLMRunner):
         if self._brain and self._agent_id:
             self._record_episode(message, result)
 
+        cost_usd = usage.get("cost_usd", 0.0)
         logger.info(
             "[ClaudeCodeRunner] done agent=%s chars=%d session=%s | "
             "in=%d out=%d cache_w=%d cache_r=%d total=%d cost=$%.4f",
@@ -259,7 +261,15 @@ class ClaudeCodeRunner(LLMRunner):
             usage.get("input_tokens", 0), usage.get("output_tokens", 0),
             usage.get("cache_creation_input_tokens", 0), usage.get("cache_read_input_tokens", 0),
             usage.get("input_tokens", 0) + usage.get("output_tokens", 0),
-            usage.get("cost_usd", 0.0),
+            cost_usd,
+        )
+
+        record_llm_call(
+            agent    = self._agent_id or "unknown",
+            usage    = usage,
+            status   = "success",
+            duration = usage.get("duration_secs", 0.0),
+            cost_usd = cost_usd,
         )
 
         return RunnerResult(

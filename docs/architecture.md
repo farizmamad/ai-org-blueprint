@@ -213,13 +213,44 @@ User: "Review the Q3 architecture decision"
 
 ---
 
+## Observability
+
+Every LLM call emits four Prometheus metrics via `core/observability/metrics.py`:
+
+```
+ai_org_tokens_total{agent, token_type}   — input / output / cache_write / cache_read
+ai_org_requests_total{agent, status}     — success / rate_limited / error
+ai_org_response_seconds{agent}           — histogram of end-to-end turn latency
+ai_org_cost_usd_total{agent}             — accumulated estimated USD cost
+```
+
+The `token_type` split is the most important one. Claude caches repeated content
+in system prompts and injected memory blocks. `cache_read` tokens cost 10× less
+than fresh `input` tokens. Without this split you can't tell whether your memory
+injection strategy is saving money or just making prompts bigger.
+
+Both `APIRunner` and `ClaudeCodeRunner` call `record_llm_call()` automatically —
+no changes needed in the agent or orchestrator layer. `prometheus_client` is
+optional: if not installed, all calls are silent no-ops.
+
+Expose metrics at startup:
+
+```python
+from core.observability.metrics import start_metrics_server
+start_metrics_server()   # GET /metrics on :9101
+```
+
+Scrape with VictoriaMetrics (or any Prometheus-compatible scraper) and visualise
+in Grafana. See [`docs/observability.md`](observability.md) for the full setup
+and a Grafana dashboard starter.
+
+---
+
 ## What this architecture does NOT have
 
 - **Authentication / authorisation** — bring your own at the entrypoint layer.
 - **Horizontal scale** — SQLite is single-writer. Swap to Postgres at the Brain
   layer if you need multiple writer processes.
-- **Observability stack** — logs go to stdout. Add your own Prometheus / Grafana
-  if this runs in production.
 - **Streaming** — AgentLoop blocks until done. WebSocket streaming is left as
   an exercise.
 - **Parallel agent fan-out** — the router dispatches sequentially. Useful future

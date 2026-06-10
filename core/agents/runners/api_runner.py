@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
 
 from core.agents.runners.base import LLMRunner, RunnerResult
+from core.observability.metrics import estimate_cost, record_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,11 @@ class APIRunner(LLMRunner):
         tools: list[dict[str, Any]] | None = None,
         messages: list[dict[str, Any]] | None = None,
     ) -> RunnerResult:
+        agent_label = session_id or "unknown"
+        start = time.monotonic()
+        status = "success"
+        usage: dict[str, Any] = {}
+
         try:
             kwargs: dict[str, Any] = {
                 "model": self._model,
@@ -94,20 +101,37 @@ class APIRunner(LLMRunner):
                         "input": block.input,
                     })
 
-            usage = {}
             if hasattr(resp, "usage") and resp.usage is not None:
                 usage = {
-                    "input_tokens": resp.usage.input_tokens,
-                    "output_tokens": resp.usage.output_tokens,
+                    "input_tokens":                  resp.usage.input_tokens,
+                    "output_tokens":                 resp.usage.output_tokens,
+                    "cache_creation_input_tokens":   getattr(resp.usage, "cache_creation_input_tokens", 0),
+                    "cache_read_input_tokens":       getattr(resp.usage, "cache_read_input_tokens", 0),
                 }
+
+            cost_usd = estimate_cost(self._model, usage)
+            record_llm_call(
+                agent    = agent_label,
+                usage    = usage,
+                status   = status,
+                duration = time.monotonic() - start,
+                cost_usd = cost_usd,
+            )
 
             return RunnerResult(
                 response="\n".join(text_parts),
                 session_id=session_id,
                 tool_calls=tool_calls,
-                usage=usage,
+                usage={**usage, "cost_usd": cost_usd},
             )
 
         except Exception as e:
+            status = "rate_limited" if "rate_limit" in str(e).lower() else "error"
+            record_llm_call(
+                agent    = agent_label,
+                usage    = usage,
+                status   = status,
+                duration = time.monotonic() - start,
+            )
             logger.exception("[APIRunner] inference failed")
             return RunnerResult(response="", error=str(e))

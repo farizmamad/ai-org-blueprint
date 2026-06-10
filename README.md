@@ -92,7 +92,8 @@ each:
 
 See [`docs/architecture.md`](docs/architecture.md) for the full mental model,
 [`docs/dual-runner-pattern.md`](docs/dual-runner-pattern.md) for the runner
-design, and [`docs/adr/`](docs/adr/) for the decisions that shaped each piece.
+design, [`docs/observability.md`](docs/observability.md) for Prometheus metrics
+setup, and [`docs/adr/`](docs/adr/) for the decisions that shaped each piece.
 
 ---
 
@@ -100,8 +101,8 @@ design, and [`docs/adr/`](docs/adr/) for the decisions that shaped each piece.
 
 - Not a framework — there's no plugin system, no abstract base class hierarchy.
   Copy what's useful, throw out what isn't.
-- Not production-ready — no auth, no rate limiting, no observability stack.
-  Fine for personal projects; bring your own ops for anything else.
+- Not production-ready — no auth, no rate limiting. Observability is included
+  (`core/observability/`) but wiring up Grafana is left to you.
 - Not the only way — multi-agent design space is wide. The README links to
   alternative approaches at the bottom.
 
