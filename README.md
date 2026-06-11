@@ -111,10 +111,3 @@ setup, and [`docs/adr/`](docs/adr/) for the decisions that shaped each piece.
 ## License
 
 [MIT](LICENSE). Use freely, attribute if you find it useful, no warranty.
-
-## Further reading
-
-- [The article](#) — the why and the journey
-- [`docs/adr/`](docs/adr/) — architecture decisions
-- [Generative Agents (Park et al., 2023)](https://arxiv.org/abs/2304.03442) — academic precedent
-- [AutoGen (Wu et al., 2023)](https://arxiv.org/abs/2308.08155) — framework approach
