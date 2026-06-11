@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-approve_action.py — CLI for reviewing and resolving HITL pending actions.
+approve_action.py - CLI for reviewing and resolving HITL pending actions.
 
 Equivalent to the Discord !approve / !reject commands for setups without Discord.
 
@@ -38,7 +39,7 @@ def cmd_list(_args: argparse.Namespace) -> None:
         print("No pending actions.")
         return
     for a in actions:
-        print(f"[{a['id']}] {a['agent_id']} → {a['tool_name']}")
+        print(f"[{a['id']}] {a['agent_id']} -> {a['tool_name']}")
         print(f"      {a['description']}")
         print(f"      created: {a['created_at']}")
         print()
